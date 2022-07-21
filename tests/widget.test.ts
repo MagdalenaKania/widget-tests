@@ -1,7 +1,11 @@
-import { expect, test } from "@playwright/test";
+import { expect, test} from "@playwright/test";
 
 test.beforeEach(async ({ page }) => {
   await page.goto("https://www.tidio.com/panel/register");
+  await page.evaluate(() => {
+    localStorage.setItem("inboxAb", "false");
+  });
+  await page.reload();
 });
 
 export const getNewEmail = (): string =>
@@ -48,12 +52,30 @@ test.describe("Widget tests", () => {
     await test.step(
       "Simulate visitor and send message from widget to panel",
       async () => {
-        await page.locator("[href='/panel/conversations']").click();
-        //TODO
+        const visitorMessage = "Message from visitor";
+        const visitorEmail = "test@test.com";
+        await page.locator('//a[@href="/panel/conversations"]').click();
+        const [newPage] = await Promise.all([
+          page.context().waitForEvent('page'),
+          page.click("//*[text()='Simulate a conversation']"),
+        ]);
+        await newPage.waitForLoadState();
+        const chatFrame = newPage.frameLocator('#tidio-chat-iframe');
+        await chatFrame.locator("button[title = 'No, thanks.']").click();
+        await chatFrame.locator('#new-message-textarea').fill(visitorMessage);
+        await chatFrame.locator('button#button-body').click();
+        await chatFrame.locator('input[type="email"]').fill(visitorEmail);
+        await chatFrame.locator('//button[text()="Send"]').click();
+        await page.locator('ul.visitor-list > li > a').click();
+        await expect(page.locator('//div[contains(@class,"message-wrapper")]/span[text()="Message from visitor"]')).toBeVisible();
       }
     );
     await test.step("Send a reply message from the panel", async () => {
-      //TODO
+      const replyMessage = "Reply message";
+      await page.locator('.css-1kfpwbs > button').click();
+      await page.locator('textarea[data-test-id="new-message-textarea"]').fill(replyMessage);
+      await page.locator('//button/span[text()="Reply"]/..').click();
+      await expect(page.locator('//div[contains(@class,"message-wrapper")]/span[text()="Reply message"]')).toBeVisible();
     });
   });
 });
